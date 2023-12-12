@@ -1,4 +1,4 @@
-import pygame, random, player, settings
+import pygame, random, player, settings, sys
 
 # initialize modules
 pygame.mixer.init()
@@ -17,10 +17,12 @@ from pygame.locals import (
 screen = pygame.display.set_mode((settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT))
 pygame.display.set_caption('Basic Game')
 
-# variables for score counter
+# Variables
+timer_duration      = 5000  # 5000 milliseconds = 5 seconds
+background_color    = (135, 206, 250)
 score_value         = 0
 previous_high_score = 0
-roll_breakdown = [0,1,2,3] # breakdown of percentage of the roll from max potential
+roll_breakdown      = [0,1,2,3] # breakdown of percentage of the roll from max potential
 font                = pygame.font.Font('freesansbold.ttf', 32)
 running             = True
 
@@ -49,23 +51,22 @@ def show_ammo(x, y):
 def set_interval(min, max, game_object, group):
     interval = random.randint(min, max)
     pygame.time.set_timer(group, interval)
-    print(f"New {game_object} interval: {interval/1000} seconds")
+    # print(f"New {game_object} interval: {interval/1000} seconds")
 
-def roll_dice(min, max):
-    die_roll = random.randint(min, max)
+# def roll_dice(min, max):
+#     die_roll = random.randint(min, max)
     
-    if die_roll <= (max*.25):
-        quadrant = roll_breakdown[0]
-    elif die_roll >= (max*.25) and die_roll <= (max*.50):
-        quadrant = roll_breakdown[1]
-    elif die_roll >= (max*.5) and die_roll <= (max*.75):
-        quadrant = roll_breakdown[2]
-    elif die_roll >= (max*.75):
-        quadrant = roll_breakdown[3]
-    else:
-        quadrant = None
-    return quadrant
-
+#     if die_roll <= (max*.25):
+#         quadrant = roll_breakdown[0]
+#     elif die_roll >= (max*.25) and die_roll <= (max*.50):
+#         quadrant = roll_breakdown[1]
+#     elif die_roll >= (max*.5) and die_roll <= (max*.75):
+#         quadrant = roll_breakdown[2]
+#     elif die_roll >= (max*.75):
+#         quadrant = roll_breakdown[3]
+#     else:
+#         quadrant = None
+#     return quadrant
 
 # Define the cloud object by extending pygame.sprite.Sprite
 # Use an image for a better-looking sprite
@@ -109,8 +110,7 @@ class Explosion(pygame.sprite.Sprite):
         if now - self.creation_time > self.duration:
             self.kill()  # Remove the explosion after its duration expires
 
-
-# Create custom events for adding a new enemy and a cloud
+# Create custom events
 ADDENEMY = pygame.USEREVENT + 1
 pygame.time.set_timer(ADDENEMY, 250)
 ADDCLOUD = pygame.USEREVENT + 2
@@ -119,6 +119,7 @@ INCREASE_SCORE = pygame.USEREVENT + 3
 pygame.time.set_timer(INCREASE_SCORE, 100)
 ADDPOWERUP = pygame.USEREVENT + 4
 set_interval(settings.MIN_INTERVAL, settings.MAX_INTERVAL, "powerup", ADDPOWERUP)
+TIMER_EVENT = pygame.USEREVENT + 5
 
 # Instantiate player. Right now, this is just a rectangle.
 player_obj = player.Player()
@@ -126,10 +127,7 @@ player_obj = player.Player()
 # Setup the clock for a decent framerate
 clock = pygame.time.Clock()
 
-# Create groups to hold enemy sprites, cloud sprites, and all sprites
-# - enemies is used for collision detection and position updates
-# - clouds is used for position updates
-# - all_sprites is used for rendering
+# Create groups to hold sprites
 enemies = pygame.sprite.Group()
 clouds = pygame.sprite.Group()
 powerups = pygame.sprite.Group()
@@ -165,7 +163,7 @@ while running:
         if event.type == QUIT:
             # Quit the game
             pygame.quit()
-            #sys.exit()
+            sys.exit()
 
         # Add a new enemy
         elif event.type == ADDENEMY:
@@ -188,13 +186,17 @@ while running:
 
         # Add a powerup
         elif event.type == ADDPOWERUP:
-            power_list = [player.Shield(), player.Double_Points()]
-            new_power = power_list[random.randint(0, len(power_list)-1)]
+            power_list = [player.Shield(), player.Double_Points(), player.Ammo()]
+            new_power = power_list[random.randint(0, (len(power_list)-1))]
             # print(f"{new_power}")
             powerups.add(new_power)
             all_sprites.add(new_power)
             # Reset the timer with a new random interval
             set_interval(settings.MIN_INTERVAL, settings.MAX_INTERVAL, "powerup", ADDPOWERUP)
+        
+        elif event.type == TIMER_EVENT:
+            settings.MODIFIER = 1
+            background_color = (135, 206, 250)  # Reset back to the original color
 
     # Get the set of keys pressed and check for user input
     pressed_keys = pygame.key.get_pressed()
@@ -207,7 +209,7 @@ while running:
     clouds.update()
 
     # Fill the screen with sky blue
-    screen.fill((135, 206, 250))
+    screen.fill(background_color)
     previous_high_score = read_high_score('highscore.txt')
     show_score(0, 0)
     show_previous_high_score(0, 60)
@@ -258,30 +260,33 @@ while running:
             running = False
 
     # Powerup Collision
+
     for powerup in powerups:
-        # Check if any powerups have collided with the player
-        powerup_collide = pygame.sprite.spritecollide(player_obj, powerups, True)  # True removes the enemy on collision
-        if powerup_collide:
+        if pygame.sprite.collide_rect(player_obj, powerup):
+            print(f"Power-up type: {powerup.powertype}")
             player.powerup_sound.stop()
             player.move_up_sound.stop()
             player.move_down_sound.stop()
             player.powerup_sound.play()
+            
             if isinstance(powerup, player.Shield) and not powerup.collided:
                 powerup.kill()
-                player_obj.defense += 1  # Give bonus to player
-                print(f"Power-up type: {powerup.powertype}")
-            elif isinstance(powerup, player.Double_Points) and not powerup.collided:
-                now = pygame.time.get_ticks()
-                if now - powerup.creation_time > powerup.duration:
-                    settings.MODIFIER = 1
-                else:
-                    settings.MODIFIER = 2
+                player_obj.defense += 1
+                powerup.collided = True
+            
+            elif isinstance(powerup, player.Ammo) and not powerup.collided:
                 powerup.kill()
-                print(f"Power-up type: {powerup.powertype}")
-            powerup.collided = True
+                powerup.collided = True
+                player_obj.ammo += 1
+                
+            elif isinstance(powerup, player.Double_Points) and not powerup.collided:
+                powerup.kill()
+                settings.MODIFIER = 2                               # Double points
+                background_color = (225, 255, 0)                    # Gold
+                pygame.time.set_timer(TIMER_EVENT, timer_duration)  # Start the timer
+                powerup.collided = True
 
-
-    # Powerup Collision
+    # Cloud Collision
     for cloud in clouds:
         if cloud.rect.contains(player_obj):
             print("Player is completely covered by the cloud")
