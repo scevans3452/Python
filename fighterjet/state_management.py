@@ -10,6 +10,8 @@ from pygame.locals import (
         QUIT,
     )
 
+
+
 SCREEN               = pygame.display.set_mode((1280, 720))
 center_offset_width  = int(SCREEN.get_width()/2)
 center_offset_height = int(SCREEN.get_height()/2)
@@ -19,14 +21,20 @@ slider_text_width    = 50
 slider_output_width  = 30
 slider_offset_width  = (center_offset_width - int(slider_width/2))
 slider_offset_height = (center_offset_height - int(slider_height/2))
+background_image = pygame.image.load('./assets/skyline.png').convert()
 
 def get_font(size):
     return pygame.font.Font('freesansbold.ttf', size)
 
+def read_high_score(self, file):
+        with open(file, 'r', encoding='utf-8') as file:
+            read_from_file = file.read()
+            previous_high_score = int(read_from_file)
+        return previous_high_score
+
 class MainMenu:
     def __init__(self):
         self.running = True
-        # self.music_playing = False  # Add a flag to track if music is playing
         self.screen_width, self.screen_height = SCREEN.get_size()
         self.menu_text = get_font(100).render("FIGHTER PILOT", True, "#b68f40")
         self.menu_rect = self.menu_text.get_rect(center=(640, 150))
@@ -35,6 +43,7 @@ class MainMenu:
         while self.running:
             MENU_MOUSE_POS = pygame.mouse.get_pos()
             SCREEN.fill((0, 0, 0))  # Clear screen
+            SCREEN.blit(background_image, (0,-100))
             # Buttons
             PLAY_BUTTON         = Button(image=None, pos=(640, 300), text_input="PLAY",         font=get_font(70), base_color="red", hovering_color="White")
             OPTIONS_BUTTON      = Button(image=None, pos=(640, 400), text_input="OPTIONS",      font=get_font(70), base_color="red", hovering_color="White")
@@ -51,7 +60,6 @@ class MainMenu:
 
             # Check for events
             for event in pygame.event.get():
-                # Did the user hit a key?
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE:
                         self.running = False
@@ -59,20 +67,21 @@ class MainMenu:
                         sys.exit()
                 if event.type == QUIT:
                     self.running = False
-                    # Quit the game
                     pygame.quit()
                     sys.exit()
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    for button in [PLAY_BUTTON, OPTIONS_BUTTON, QUIT_BUTTON]:
+                    for button in [PLAY_BUTTON, OPTIONS_BUTTON, QUIT_BUTTON, ACHIEVEMENTS_BUTTON]:
                         button.changeColor(MENU_MOUSE_POS)
                         button.update(SCREEN)
                         if button.hover(MENU_MOUSE_POS):
                             if button.text_input   == "PLAY":
                                 state_manager.start_game()
-                                # self.music_playing = False
                                 state_manager.start_main_menu() # don't want new instance, just got back to where we were
                             elif button.text_input == "OPTIONS":
                                 state_manager.change_state('options_menu')
+                                state_manager.run_current_state(state_manager)
+                            elif button.text_input == "ACHIEVEMENTS":
+                                state_manager.change_state('achievements_menu')
                                 state_manager.run_current_state(state_manager)
                             elif button.text_input == "QUIT":
                                 pygame.quit()
@@ -87,6 +96,8 @@ class OptionsMenu:
     def __init__(self):
         self.running = True
         self.screen_width, self.screen_height = SCREEN.get_size()
+        self.menu_text = get_font(100).render("OPTIONS", True, "#b68f40")
+        self.menu_rect = self.menu_text.get_rect(center=(640, 150))
 
         # VOLUME CONTROLS
         self.volume_control = {
@@ -102,16 +113,14 @@ class OptionsMenu:
         while self.running:
             events = pygame.event.get()
             SCREEN.fill((0, 0, 0))  # Clear screen
-            menu_text = get_font(100).render("OPTIONS", True, "#b68f40")
-            menu_rect = menu_text.get_rect(center=(640, 100))
 
             MENU_MOUSE_POS = pygame.mouse.get_pos()
-            BACK_BUTTON = Button(image=None, pos=(640, 250), text_input="BACK", font=get_font(75),
+            BACK_BUTTON = Button(image=None, pos=(640, SCREEN.get_height() - 100), text_input="BACK", font=get_font(75),
                                  base_color="red", hovering_color="White")
             BACK_BUTTON.changeColor(MENU_MOUSE_POS)
             BACK_BUTTON.update(SCREEN)
 
-            SCREEN.blit(menu_text, menu_rect)
+            SCREEN.blit(self.menu_text, self.menu_rect)
 
             # Draw and update the slider
             # FOR LOOP IF THERE ARE MORE SLIDERS SETUP
@@ -148,11 +157,70 @@ class OptionsMenu:
             # Update and render elements specific to the options menu
             pygame.display.flip()
 
+class AchievementsMenu:
+    def __init__(self):
+        self.running = True
+        self.screen_width, self.screen_height = SCREEN.get_size()
+        self.menu_text = get_font(100).render("ACHIEVEMENTS", True, "#b68f40")
+        self.menu_rect = self.menu_text.get_rect(center=(640, 150))
+
+        # Add all achievements to map
+        self.achievements_map = {
+            'highscore'         : get_font(24).render("HIGHSCORE: " + str(read_high_score(self, 'highscore.txt')), True, "#b68f40"),
+            'next'              : get_font(24).render("NEXT ACHIEVEMENT", True, "#b68f40"),
+            'next2'              : get_font(24).render("NEXT ACHIEVEMENT", True, "#b68f40"),
+        }
+
+        # Create list of key/values for dynamically adding later
+        self.achievements_keys = list(self.achievements_map.keys())
+        self.achievements_values = list(self.achievements_map.values())
+
+    def run(self, state_manager):
+        pygame.mixer.init()
+        while self.running:
+            events = pygame.event.get()
+            SCREEN.fill((0, 0, 0))  # Clear screen
+            
+            MENU_MOUSE_POS = pygame.mouse.get_pos()
+            BACK_BUTTON = Button(image=None, pos=(640, SCREEN.get_height() - 100), text_input="BACK", font=get_font(75),
+                                 base_color="red", hovering_color="White")
+            BACK_BUTTON.changeColor(MENU_MOUSE_POS)
+            BACK_BUTTON.update(SCREEN)
+
+            SCREEN.blit(self.menu_text, self.menu_rect)
+            for index, key in enumerate(self.achievements_keys):
+                if index < len(self.achievements_values):
+                    text_surface = self.achievements_values[index]
+                    center_x = (SCREEN.get_width() - text_surface.get_width()) // 2
+                    y_position = 300 + index * 30  # Adjust these values as needed
+                    SCREEN.blit(text_surface, (center_x, y_position))
+
+
+            # Check for events
+            for event in events:
+                if event.type == KEYDOWN:
+                    if event.key == K_ESCAPE:
+                        state_manager.start_main_menu()
+                if event.type == QUIT:
+                    self.running = False
+                    pygame.quit()
+                    sys.exit()
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    BACK_BUTTON.changeColor(MENU_MOUSE_POS)
+                    BACK_BUTTON.update(SCREEN)
+                    if BACK_BUTTON.hover(MENU_MOUSE_POS):
+                        state_manager.start_main_menu()
+            pygame.display.update()
+            pygame.display.flip()
+
+
+
 class StateManager:
     def __init__(self):
         self.states = {
             'main_menu': MainMenu(),
             'options_menu': OptionsMenu(),
+            'achievements_menu': AchievementsMenu(),
             'gameplay': Game()
         }
         self.current_state = 'main_menu'
