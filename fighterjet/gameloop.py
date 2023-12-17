@@ -54,7 +54,7 @@ class Game:
         self.all_sprites.add(self.player_obj.bullets)  # Add bullets to the group
 
         # Preload objects
-        for _ in range(random.randint(4, 7)):
+        for _ in range(random.randint(4, 10)):
             new_cloud = Cloud()
             new_cloud.rect.center = (
                 random.randint(0, settings.SCREEN_WIDTH),
@@ -100,15 +100,12 @@ class Game:
         while self.running:
             if not self.paused:
                 pygame.mixer.music.set_volume(settings.ACTUAL_VOLUME)
-                # Process events, update game state, and draw elements
                 for event in pygame.event.get():
-                    # Did the user hit a key?
                     if event.type == KEYDOWN:
                         if event.key == K_ESCAPE:
                             self.paused = not self.paused
                             # self.running = False
                     if event.type == QUIT:
-                        # Quit the game
                         pygame.quit()
                         sys.exit()
 
@@ -228,9 +225,9 @@ class Game:
                             
                         elif isinstance(powerup, player.Double_Points) and not powerup.collided:
                             powerup.kill()
-                            settings.MODIFIER = 2                               # Double points
-                            self.background_color = (225, 255, 0)                    # Gold
-                            pygame.time.set_timer(self.TIMER_EVENT, self.timer_duration)  # Start the timer
+                            settings.MODIFIER = 2                                           # Double points
+                            self.background_color = (225, 255, 0)                           # Gold
+                            pygame.time.set_timer(self.TIMER_EVENT, self.timer_duration)    # Start the timer
                             powerup.collided = True
 
                 # Cloud Collision
@@ -247,17 +244,24 @@ class Game:
 
             else:  # When paused, show the pause menu
                 pygame.mixer.music.set_volume(settings.ACTUAL_VOLUME*.3)
-                self.screen.fill((0, 0, 0))  # Clear the screen
                 MENU_MOUSE_POS = pygame.mouse.get_pos()
+
+                # Create a surface with per-pixel alpha
+                alpha_surface = pygame.Surface((500, 300), pygame.SRCALPHA)
+                pygame.draw.rect(alpha_surface, (135, 206, 250, 100), (0, 0, 500, 300))
+
+                # Blit the surface onto the screen
+                self.screen.blit(alpha_surface, ((self.screen.get_width() - 500) // 2, (self.screen.get_height() - 300) // 2))
 
                 # Render and display your pause menu elements
                 pause_text = get_font(50).render("Paused", True, (255, 255, 255))
-                pause_rect = pause_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 - 50))
-                self.screen.blit(pause_text, pause_rect)
+                pause_text_rect = pause_text.get_rect(center=(self.screen.get_width() // 2, (self.screen.get_height() - 300) // 2 + 50))
 
-                RESUME_BUTTON   = Button(image=None, pos=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 + 50), text_input="Resume", font=get_font(40), base_color="red", hovering_color="White")
-                QUIT_BUTTON     = Button(image=None, pos=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 + 100), text_input="Main Menu", font=get_font(40), base_color="red", hovering_color="White")
-                
+                RESUME_BUTTON = Button(image=None, pos=(self.screen.get_width() // 2, (self.screen.get_height() - 300) // 2 + 120), text_input="Resume", font=get_font(40), base_color="red", hovering_color="White")
+                QUIT_BUTTON = Button(image=None, pos=(self.screen.get_width() // 2, (self.screen.get_height() - 300) // 2 + 180), text_input="Main Menu", font=get_font(40), base_color="red", hovering_color="White")
+
+                self.screen.blit(pause_text, pause_text_rect)
+
                 for button in [RESUME_BUTTON, QUIT_BUTTON]:
                     button.changeColor(MENU_MOUSE_POS)
                     button.update(self.screen)
