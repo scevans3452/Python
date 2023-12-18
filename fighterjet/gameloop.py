@@ -8,6 +8,22 @@ from pygame.locals import (RLEACCEL, K_ESCAPE, KEYDOWN, QUIT)
 def get_font(size):
     return pygame.font.Font('freesansbold.ttf', size)
 
+# Game Over function
+def game_over_screen(screen):
+    game_over = True
+    while game_over:
+        screen.fill((0, 0, 0))  # Clear screen
+        # Render and display your pause menu elements
+        game_over_text      = get_font(50).render("game_over. press any key to continue", True, (255, 255, 255))
+        game_over_text_rect = game_over_text.get_rect(center=(screen.get_width() // 2, (screen.get_height() - 300) // 2 + 50))
+        screen.blit(game_over_text, game_over_text_rect)
+        pygame.display.flip()
+        
+        # Handle events for game over screen
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN or event.type == pygame.QUIT:
+                game_over = False
+
 class Game:
     def __init__(self):
         # Set the screen to windowed mode
@@ -286,21 +302,13 @@ class Game:
                 pygame.mixer.music.set_volume(settings.ACTUAL_VOLUME*.3)
                 MENU_MOUSE_POS = pygame.mouse.get_pos()
 
-                # Create a surface with per-pixel alpha
-                alpha_surface = pygame.Surface((500, 300), pygame.SRCALPHA)
-                pygame.draw.rect(alpha_surface, (135, 206, 250, 100), (0, 0, 500, 300))
-
-                # Blit the surface onto the screen
-                self.screen.blit(alpha_surface, ((self.screen.get_width() - 500) // 2, (self.screen.get_height() - 300) // 2))
-
                 # Render and display your pause menu elements
-                pause_text = get_font(50).render("Paused", True, (255, 255, 255))
+                pause_text      = get_font(50).render("Paused", True, (0, 0, 0))
                 pause_text_rect = pause_text.get_rect(center=(self.screen.get_width() // 2, (self.screen.get_height() - 300) // 2 + 50))
-
-                RESUME_BUTTON = Button(image=None, pos=(self.screen.get_width() // 2, (self.screen.get_height() - 300) // 2 + 120), text_input="Resume", font=get_font(40), base_color="red", hovering_color="White")
-                QUIT_BUTTON = Button(image=None, pos=(self.screen.get_width() // 2, (self.screen.get_height() - 300) // 2 + 180), text_input="Main Menu", font=get_font(40), base_color="red", hovering_color="White")
-
                 self.screen.blit(pause_text, pause_text_rect)
+
+                RESUME_BUTTON   = Button(image=None, pos=(self.screen.get_width() // 2, (self.screen.get_height() - 300) // 2 + 120), text_input="Resume", font=get_font(40), base_color="red", hovering_color="White")
+                QUIT_BUTTON     = Button(image=None, pos=(self.screen.get_width() // 2, (self.screen.get_height() - 300) // 2 + 180), text_input="Main Menu", font=get_font(40), base_color="red", hovering_color="White")
 
                 for button in [RESUME_BUTTON, QUIT_BUTTON]:
                     button.changeColor(MENU_MOUSE_POS)
@@ -322,6 +330,4 @@ class Game:
                         sys.exit()
 
                 pygame.display.flip()
-
-        # pygame.mixer.music.stop()
-        # pygame.mixer.quit()
+        game_over_screen(self.screen)
