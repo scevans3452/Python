@@ -1,4 +1,5 @@
 import pygame, random, sys, settings, player, settings
+from powerup import *
 from button import Button
 from explosion import Explosion
 from cloud import Cloud
@@ -36,7 +37,8 @@ class Game:
         self.ADDPOWERUP = pygame.USEREVENT + 4
         self.set_interval(settings.MIN_INTERVAL, settings.MAX_INTERVAL, "powerup", self.ADDPOWERUP)
 
-        self.TIMER_EVENT = pygame.USEREVENT + 5
+        self.DOUBLE_POINTS_TIMER = pygame.USEREVENT + 5
+        self.MULTI_SHOT_TIMER = pygame.USEREVENT + 6
 
         # Create groups to hold sprites
         self.enemies = pygame.sprite.Group()
@@ -130,21 +132,32 @@ class Game:
 
                     # Add a powerup
                     elif event.type == self.ADDPOWERUP:
-                        self.power_list = [player.Shield(), player.Double_Points(), player.Ammo()]
+                        self.power_list = [Shield(), Double_Points(), Ammo(), Multi_Shot()]
+                        self.powerup_options = [ # Weight totals should be in increments of 10 to help with simplicity
+                            (self.power_list[0], 1), # 10% shield
+                            (self.power_list[1], 1), # 10% double
+                            (self.power_list[2], 8),  # 80% ammo
+                            (self.power_list[3], 100)  # 80% MultiShot
+                        ]
+                        # Choose a powerup based on weighted probability
+                        self.selected_powerup = random.choices(*zip(*self.powerup_options))[0]
                         self.new_power = self.power_list[random.randint(0, (len(self.power_list)-1))]
                         # print(f"{new_power}")
-                        self.powerups.add(self.new_power)
-                        self.all_sprites.add(self.new_power)
-                        # Reset the timer with a new random interval
+                        self.powerups.add(self.selected_powerup)
+                        self.all_sprites.add(self.selected_powerup)
                         self.set_interval(settings.MIN_INTERVAL, settings.MAX_INTERVAL, "powerup", self.ADDPOWERUP)
                     
-                    elif event.type == self.TIMER_EVENT:
+                    elif event.type == self.DOUBLE_POINTS_TIMER:
                         settings.MODIFIER = 1
                         self.background_color = (135, 206, 250)  # Reset back to the original color
+
+                    elif event.type == self.MULTI_SHOT_TIMER:
+                        self.player_obj.multi_shot_enabled = False
 
                 # Get the set of keys pressed and check for user input
                 pressed_keys = pygame.key.get_pressed()
                 self.player_obj.update(pressed_keys)
+
                 self.player_obj.bullets.update()
 
                 # Update the position of enemies and clouds
@@ -154,6 +167,24 @@ class Game:
 
                 # Fill the screen with sky blue
                 self.screen.fill(self.background_color)
+
+                # AIMING RETICLE
+                # Calculate the endpoint coordinates
+                # Adjust the starting and ending coordinates
+                start_x = self.player_obj.rect.midright[0] - 5  # Shift left by 5 pixels
+                start_y = self.player_obj.rect.midright[1] + 5  # Shift down by 5 pixels
+
+                end_x = start_x + self.player_obj.aiming_line_length
+                end_y = start_y
+
+                # Create a surface with per-pixel alpha
+                transparent_surface = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
+                # Draw the shifted partially transparent line on the surface
+                pygame.draw.line(transparent_surface, (255, 0, 0, 100), (start_x, start_y), (end_x, end_y), 3)
+
+                # Blit the surface onto the main screen
+                self.screen.blit(transparent_surface, (0, 0))
+
                 self.previous_high_score = self.read_high_score('highscore.txt')
                 self.show_score(0, 0)
                 self.show_previous_high_score(0, 60)
@@ -213,21 +244,30 @@ class Game:
                         player.move_down_sound.stop()
                         player.powerup_sound.play()
                         
-                        if isinstance(powerup, player.Shield) and not powerup.collided:
+                        if isinstance(powerup, Shield) and not powerup.collided:
                             powerup.kill()
                             self.player_obj.defense += 1
                             powerup.collided = True
                         
-                        elif isinstance(powerup, player.Ammo) and not powerup.collided:
+                        elif isinstance(powerup, Ammo) and not powerup.collided:
                             powerup.kill()
                             powerup.collided = True
-                            self.player_obj.ammo += 1
+                            self.player_obj.ammo += 2
                             
-                        elif isinstance(powerup, player.Double_Points) and not powerup.collided:
+                        elif isinstance(powerup, Multi_Shot) and not powerup.collided:
                             powerup.kill()
-                            settings.MODIFIER = 2                                           # Double points
-                            self.background_color = (225, 255, 0)                           # Gold
-                            pygame.time.set_timer(self.TIMER_EVENT, self.timer_duration)    # Start the timer
+                            powerup.collided = True
+                            print(f"COLLIDED WITH MULTI SHOT")
+                            pygame.time.set_timer(self.MULTI_SHOT_TIMER, self.timer_duration)    # Start the timer                     
+                            # MAKE PLAYER FIRE IN A SPREAD SHOT PATTERN WHEN SPACE BAR IS PRESSED.
+                            self.player_obj.multi_shot_enabled = True
+                            self.player_obj.ammo += 5
+                            
+                        elif isinstance(powerup, Double_Points) and not powerup.collided:
+                            powerup.kill()
+                            settings.MODIFIER = 2                                                   # Double points
+                            self.background_color = (225, 255, 0)                                   # Gold
+                            pygame.time.set_timer(self.DOUBLE_POINTS_TIMER, self.timer_duration)    # Start the timer
                             powerup.collided = True
 
                 # Cloud Collision
@@ -240,7 +280,7 @@ class Game:
 
 
                 pygame.display.flip()
-                self.clock.tick(30) # Ensure program maintains a rate of 30 frames per second
+                self.clock.tick(60) # Ensure program maintains a rate of 30 frames per second
 
             else:  # When paused, show the pause menu
                 pygame.mixer.music.set_volume(settings.ACTUAL_VOLUME*.3)
