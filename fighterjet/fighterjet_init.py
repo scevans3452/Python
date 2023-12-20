@@ -1,4 +1,4 @@
-import pygame, pygame_widgets, sys, settings
+import pygame, pygame_widgets, sys, settings, math
 
 from pygame_widgets.slider import Slider
 from pygame_widgets.textbox import TextBox
@@ -21,7 +21,16 @@ slider_text_width    = 50
 slider_output_width  = 30
 slider_offset_width  = (center_offset_width - int(slider_width/2))
 slider_offset_height = (center_offset_height - int(slider_height/2))
-background_image = pygame.image.load('./assets/skyline.png').convert()
+#load image
+bg = pygame.image.load("./assets/skyline_updated.png").convert()
+bg_width = bg.get_width()
+bg_height = bg.get_height()  # Get the original height of the image
+
+# Calculate the scale factor for the image height to fit the screen
+scale_factor = SCREEN.get_height() / bg_height
+
+# Resize the image to fit the screen height while maintaining aspect ratio
+bg = pygame.transform.scale(bg, (int(bg_width * scale_factor), SCREEN.get_height()))
 
 def get_font(size):
     return pygame.font.Font('freesansbold.ttf', size)
@@ -38,21 +47,38 @@ class MainMenu:
         self.screen_width, self.screen_height = SCREEN.get_size()
         self.menu_text = get_font(100).render("FIGHTER PILOT", True, "#b68f40")
         self.menu_rect = self.menu_text.get_rect(center=(640, 150))
+        self.scroll = 0
+        self.tiles = math.ceil(SCREEN.get_width()  / bg.get_width()) + 1
+        self.focused_button_index = 0  # Initially, the first button is focused
 
     def run(self, state_manager):
         while self.running:
-            MENU_MOUSE_POS = pygame.mouse.get_pos()
             SCREEN.fill((0, 0, 0))  # Clear screen
-            SCREEN.blit(background_image, (0,-100))
+            #draw scrolling background
+            for i in range(0, self.tiles):
+                SCREEN.blit(bg, (i * bg.get_width() + self.scroll, 0))
+                # pygame.draw.rect(screen, (255, 0, 0), (i * bg.get_width() + scroll, 0, bg.get_width(), SCREEN_HEIGHT), 1)
+
+            #scroll background
+            self.scroll -= .1
+
+            #reset scroll
+            if abs(self.scroll) > bg.get_width():
+                self.scroll = 0
+                
+            MENU_MOUSE_POS = pygame.mouse.get_pos()
+            # SCREEN.blit(bg, (0,-100))
             # Buttons
-            PLAY_BUTTON         = Button(image=None, pos=(640, 300), text_input="PLAY",         font=get_font(70), base_color="red", hovering_color="White")
-            OPTIONS_BUTTON      = Button(image=None, pos=(640, 400), text_input="OPTIONS",      font=get_font(70), base_color="red", hovering_color="White")
-            ACHIEVEMENTS_BUTTON = Button(image=None, pos=(640, 500), text_input="ACHIEVEMENTS", font=get_font(70), base_color="red", hovering_color="White")
-            QUIT_BUTTON         = Button(image=None, pos=(640, 600), text_input="QUIT",         font=get_font(70), base_color="red", hovering_color="White")
+            PLAY_BUTTON         = Button(image=None, pos=(640, 300), text_input="PLAY",         font=get_font(70), base_color="red", hovering_color="green")
+            OPTIONS_BUTTON      = Button(image=None, pos=(640, 400), text_input="OPTIONS",      font=get_font(70), base_color="red", hovering_color="green")
+            ACHIEVEMENTS_BUTTON = Button(image=None, pos=(640, 500), text_input="ACHIEVEMENTS", font=get_font(70), base_color="red", hovering_color="green")
+            QUIT_BUTTON         = Button(image=None, pos=(640, 600), text_input="QUIT",         font=get_font(70), base_color="red", hovering_color="green")
+
+            button_list = [PLAY_BUTTON, OPTIONS_BUTTON, QUIT_BUTTON, ACHIEVEMENTS_BUTTON]
             
             pygame.display.set_caption('Main Menu')
 
-            for button in [PLAY_BUTTON, OPTIONS_BUTTON, QUIT_BUTTON, ACHIEVEMENTS_BUTTON]:
+            for button in button_list:
                 button.changeColor(MENU_MOUSE_POS)
                 button.update(SCREEN)
 
@@ -76,7 +102,7 @@ class MainMenu:
                         if button.hover(MENU_MOUSE_POS):
                             if button.text_input   == "PLAY":
                                 state_manager.start_game()
-                                state_manager.start_main_menu() # don't want new instance, just got back to where we were
+                                state_manager.start_main_menu()
                             elif button.text_input == "OPTIONS":
                                 state_manager.change_state('options_menu')
                                 state_manager.run_current_state(state_manager)
@@ -212,8 +238,6 @@ class AchievementsMenu:
                         state_manager.start_main_menu()
             pygame.display.update()
             pygame.display.flip()
-
-
 
 class StateManager:
     def __init__(self):

@@ -1,4 +1,4 @@
-import pygame, settings, random
+import pygame, settings, random, math
 # Setup for sounds. Defaults are good.
 pygame.mixer.init()
 pygame.init()
@@ -44,6 +44,9 @@ class Player(pygame.sprite.Sprite):
         self.bullets        = pygame.sprite.Group()  # Group for holding bullets
         self.ammo           = 10
         self.defense        = 0
+        # Define the length of the aiming line
+        self.aiming_line_length = 500  # Adjust as needed
+        self.multi_shot_enabled = False
     
     # Move the sprite based on user keypresses
     def update(self, pressed_keys):
@@ -62,7 +65,7 @@ class Player(pygame.sprite.Sprite):
             time_since_last_shot = current_time - self.last_shot
             if time_since_last_shot >= 500 and self.ammo > 0:  # Limit firing rate to once per second (1000 milliseconds)
                 self.ammo -= 1
-                self.fire()
+                self.fire(self.multi_shot_enabled)
                 self.last_shot = current_time  # Update the time
                 
         # Update the animation frame based on the frame rate
@@ -84,90 +87,48 @@ class Player(pygame.sprite.Sprite):
         if self.rect.bottom >= settings.SCREEN_HEIGHT:
             self.rect.bottom = settings.SCREEN_HEIGHT
     
-    def fire(self):
-        bullet = Bullet(self.rect.midright)  # Create a bullet at player's left side
-        self.bullets.add(bullet)  # Add the bullet to the bullets group
+    def fire(self, bool):
+        trajectory_list = ["right", "up_right", "down_right"]
+        if self.multi_shot_enabled:
+            # self.fire(["right", "up_right", "down_right"])
+            for trajectory in trajectory_list:
+                bullet = Bullet(self.rect.midright, trajectory)
+                self.bullets.add(bullet)  # Add the bullet to the bullets group
+        else:
+            bullet = Bullet(self.rect.midright)  # Create a bullet at player's left side
+            self.bullets.add(bullet)  # Add the bullet to the bullets group
 
 class Bullet(pygame.sprite.Sprite):
-    def __init__(self, pos):
+    def __init__(self, pos, trajectory="right"):
         super(Bullet, self).__init__()
         self.base_image = pygame.image.load("./assets/laser.png").convert()
         self.surf = pygame.transform.scale(self.base_image, (settings.BULLET_WIDTH, settings.BULLET_HEIGHT))
         self.surf.set_colorkey((255, 255, 255), RLEACCEL)
         self.rect = self.surf.get_rect(midleft=(pos[0] - 34, pos[1] + 5))
         self.speed = 12  # Adjust the bullet's speed as needed
+        self.trajectory = trajectory  # Store the trajectory
+        self.rotation_angle = -30
+        if self.trajectory == "up_right":
+            self.rotation_angle = self.rotation_angle
+        elif self.trajectory == "down_right":
+            self.rotation_angle = abs(self.rotation_angle)
+        elif self.trajectory == "right":
+            self.rotation_angle = 0
+        self.surf = pygame.transform.rotate(self.surf, self.rotation_angle)
 
-    def update(self):
-        self.rect.move_ip(self.speed, 0)  # Move the bullet towards the right
-        if self.rect.left > settings.SCREEN_WIDTH:  # Remove the bullet if it goes off the screen
-            self.kill()  # Remove the sprite from all groups it belongs to
+    def update(self, x=None, y=0):
+        # Convert angle to radians for math functions
+        angle_radians = math.radians(abs(self.rotation_angle))
 
-class Shield(pygame.sprite.Sprite):
-    def __init__(self):
-        super(Shield, self).__init__()
-        self.base_image = pygame.image.load("./assets/shield.png").convert()
-        self.surf = pygame.transform.scale(self.base_image, (settings.POW_WIDTH, settings.POW_HEIGHT))
-        self.rect = self.surf.get_rect()
-        self.surf.set_colorkey((255, 255, 255), RLEACCEL)
-        self.powertype = "Shield"
-        self.collided = False
-        self.rect = self.surf.get_rect(
-            center=(
-                random.randint(settings.SCREEN_WIDTH + 20, settings.SCREEN_WIDTH + 100),
-                random.randint(0, settings.SCREEN_HEIGHT),
-            )
-        )
-        self.speed = 6
-    
-    def update(self):
-        self.rect.move_ip(-self.speed, 0)
-        if self.rect.right < 0:
-            self.kill()
-
-class Ammo(pygame.sprite.Sprite):
-    def __init__(self):
-        super(Ammo, self).__init__()
-        self.base_image = pygame.image.load("./assets/ammo.png").convert()
-        self.surf = pygame.transform.scale(self.base_image, (settings.POW_WIDTH, settings.POW_HEIGHT))
-        self.rect = self.surf.get_rect()
-        self.surf.set_colorkey((255, 255, 255), RLEACCEL)
-        self.powertype = "Ammo"
-        self.collided = False
-        self.rect = self.surf.get_rect(
-            center=(
-                random.randint(settings.SCREEN_WIDTH + 20, settings.SCREEN_WIDTH + 100),
-                random.randint(0, settings.SCREEN_HEIGHT),
-            )
-        )
-        self.speed = 6
-    
-    def update(self):
-        self.rect.move_ip(-self.speed, 0)
-        if self.rect.right < 0:
-            self.kill()
-
-class Double_Points(pygame.sprite.Sprite):
-    def __init__(self):
-        super(Double_Points, self).__init__()
-        self.base_image = pygame.image.load("./assets/Double_Points.png").convert()
-        self.surf = pygame.transform.scale(self.base_image, (settings.POW_WIDTH, settings.POW_HEIGHT))
-        self.rect = self.surf.get_rect()
-        self.surf.set_colorkey((0, 0, 0), RLEACCEL)
-        self.powertype = "Double_Points"
-        self.collided = False
-        self.creation_time = pygame.time.get_ticks()
-        self.duration = 3000 # 3 seconds
-        self.rect = self.surf.get_rect(
-            center=(
-                random.randint(settings.SCREEN_WIDTH + 20, settings.SCREEN_WIDTH + 100),
-                random.randint(0, settings.SCREEN_HEIGHT),
-            )
-        )
-        self.speed = 6
-    
-    def update(self):
-        self.rect.move_ip(-self.speed, 0)
-        if self.rect.right < 0:
+        # Calculate the vertical distance (y)
+        if x is None:
+            x = self.speed  # Set x to self.speed if no x value is provided
+        if self.trajectory == "up_right":       # Logic for bullets moving diagonally up and right
+            y = x * math.tan(angle_radians)
+        elif self.trajectory == "down_right":   # Logic for bullets moving diagonally down and right
+            y = -(x * math.tan(angle_radians))
+        self.rect.move_ip(x, y)
+        if self.rect.left > settings.SCREEN_WIDTH or self.rect.right < 0 or self.rect.top < 0 or self.rect.bottom > settings.SCREEN_HEIGHT:
             self.kill()
 
 class Enemy(pygame.sprite.Sprite):
@@ -178,10 +139,10 @@ class Enemy(pygame.sprite.Sprite):
         self.rect = self.surf.get_rect(
             center=(
                 random.randint(settings.SCREEN_WIDTH + 20, settings.SCREEN_WIDTH + 100),
-                random.randint(0, settings.SCREEN_HEIGHT),
+                random.randint(12, settings.SCREEN_HEIGHT - 12), # using 12's because enemies can sometimes be impossible to shoot, or slightly off screen
             )
         )
-        self.speed = random.randint(5, 20)
+        self.speed = random.randint(5, 12)
         self.collided = False
 
     # Move the sprite based on speed
